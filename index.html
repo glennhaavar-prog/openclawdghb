@@ -755,6 +755,86 @@
             setupDragAndDrop();
         });
 
+        // Default tasks (loaded on first visit)
+        const defaultTasks = [
+            // Done - Today's accomplishments (Feb 1, 2026)
+            {
+                id: 'done-1',
+                title: 'Install Claude Code on EC2',
+                description: 'v2.1.29 installed, authenticated with Max plan',
+                priority: 'high',
+                column: 'done',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T20:00:00Z'
+            },
+            {
+                id: 'done-2',
+                title: 'Set up GitHub repo & Pages',
+                description: 'glennhaavar-prog/openclawdghb - deployed to GitHub Pages',
+                priority: 'high',
+                column: 'done',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T21:00:00Z'
+            },
+            {
+                id: 'done-3',
+                title: 'Build Kanban Dashboard',
+                description: 'Dark theme, drag & drop, localStorage, 5 columns',
+                priority: 'high',
+                column: 'done',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T22:00:00Z'
+            },
+            {
+                id: 'done-4',
+                title: 'Configure Brave Web Search',
+                description: 'API key added to OpenClaw config, tested working',
+                priority: 'medium',
+                column: 'done',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T22:30:00Z'
+            },
+            {
+                id: 'done-5',
+                title: 'Add Assignee Feature',
+                description: 'Glenn/Nikoline assignments, visual borders, clipboard button, toast notifications',
+                priority: 'high',
+                column: 'done',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T23:30:00Z'
+            },
+            // To Do - Tomorrow
+            {
+                id: 'todo-1',
+                title: 'Set up Gmail/Google Workspace',
+                description: 'Email access, calendar integration for Nikoline',
+                priority: 'high',
+                column: 'todo',
+                assignee: 'glenn',
+                createdAt: '2026-02-01T23:45:00Z'
+            },
+            // In Progress - Tonight
+            {
+                id: 'inprog-1',
+                title: 'Bitcoin Conference 2026 Pricing Research',
+                description: 'Research all Bitcoin conferences in 2026, compare ticket prices with bitcoinbeyond66.com, provide pricing advice',
+                priority: 'high',
+                column: 'inprogress',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T23:50:00Z'
+            },
+            // Ideas - Future
+            {
+                id: 'idea-1',
+                title: 'Phase 2: Webhook Integration',
+                description: 'Add webhooks for automatic task pickup so Nikoline can receive tasks directly from Kanban',
+                priority: 'medium',
+                column: 'ideas',
+                assignee: 'nikoline',
+                createdAt: '2026-02-01T23:55:00Z'
+            }
+        ];
+
         // Local Storage
         function loadTasks() {
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -764,6 +844,11 @@
                 } catch (e) {
                     tasks = [];
                 }
+            }
+            // Load default tasks on first visit
+            if (tasks.length === 0) {
+                tasks = [...defaultTasks];
+                saveTasks();
             }
         }
 
