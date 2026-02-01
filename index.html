@@ -527,6 +527,65 @@
             height: 16px;
             font-size: 14px;
         }
+
+        /* Assignee borders */
+        .task-card.assignee-nikoline {
+            border-left: 3px solid #58a6ff;
+        }
+
+        .task-card.assignee-glenn {
+            border-left: 3px solid #3fb950;
+        }
+
+        /* Assignee badge */
+        .assignee-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .assignee-avatar {
+            font-size: 0.875rem;
+        }
+
+        /* Send to Nikoline button */
+        .btn-send {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            margin-top: 0.5rem;
+        }
+
+        .btn-send:hover {
+            background: rgba(88, 166, 255, 0.2);
+            border-color: var(--accent-blue);
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-green);
+            color: var(--text-primary);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            z-index: 2000;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -621,6 +680,9 @@
         </div>
     </main>
 
+    <!-- Toast notification -->
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
     <!-- Task Modal -->
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal">
@@ -659,6 +721,14 @@
                                 <option value="done">Done</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskAssignee">Assignee</label>
+                        <select id="taskAssignee">
+                            <option value="unassigned">Unassigned</option>
+                            <option value="glenn">Glenn</option>
+                            <option value="nikoline">Nikoline</option>
+                        </select>
                     </div>
                     <div id="deleteSection"></div>
                 </div>
@@ -754,11 +824,53 @@
             document.getElementById('taskCount').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
         }
 
+        function getAssigneeAvatar(assignee) {
+            switch (assignee) {
+                case 'glenn': return '👤';
+                case 'nikoline': return '🤖';
+                default: return '➖';
+            }
+        }
+
+        function getAssigneeLabel(assignee) {
+            switch (assignee) {
+                case 'glenn': return 'Glenn';
+                case 'nikoline': return 'Nikoline';
+                default: return 'Unassigned';
+            }
+        }
+
+        function getColumnLabel(column) {
+            const labels = {
+                'ideas': 'Ideas',
+                'todo': 'To Do',
+                'inprogress': 'In Progress',
+                'review': 'Review',
+                'done': 'Done'
+            };
+            return labels[column] || column;
+        }
+
         function createTaskCard(task) {
             const card = document.createElement('div');
             card.className = 'task-card';
+
+            // Add assignee class for border styling
+            if (task.assignee === 'nikoline') {
+                card.classList.add('assignee-nikoline');
+            } else if (task.assignee === 'glenn') {
+                card.classList.add('assignee-glenn');
+            }
+
             card.draggable = true;
             card.dataset.taskId = task.id;
+
+            const assignee = task.assignee || 'unassigned';
+            const sendButton = assignee === 'nikoline' ? `
+                <button class="btn btn-send" onclick="event.stopPropagation(); copyTaskToClipboard('${task.id}')" title="Copy task for Nikoline">
+                    Send to Nikoline
+                </button>
+            ` : '';
 
             card.innerHTML = `
                 <div class="task-card-header">
@@ -775,8 +887,13 @@
                 ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ''}
                 <div class="task-meta">
                     <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+                    <span class="assignee-badge">
+                        <span class="assignee-avatar">${getAssigneeAvatar(assignee)}</span>
+                        ${getAssigneeLabel(assignee)}
+                    </span>
                     <span class="task-date">${formatDate(task.createdAt)}</span>
                 </div>
+                ${sendButton}
             `;
 
             return card;
@@ -795,6 +912,7 @@
             document.getElementById('submitBtn').textContent = 'Create Task';
             document.getElementById('taskForm').reset();
             document.getElementById('taskColumn').value = column;
+            document.getElementById('taskAssignee').value = 'unassigned';
             document.getElementById('deleteSection').innerHTML = '';
             document.getElementById('modalOverlay').classList.add('active');
             document.getElementById('taskTitle').focus();
@@ -816,6 +934,7 @@
             document.getElementById('taskDescription').value = task.description || '';
             document.getElementById('taskPriority').value = task.priority;
             document.getElementById('taskColumn').value = task.column;
+            document.getElementById('taskAssignee').value = task.assignee || 'unassigned';
 
             document.getElementById('deleteSection').innerHTML = `
                 <div class="delete-confirm">
@@ -839,6 +958,7 @@
             const description = document.getElementById('taskDescription').value.trim();
             const priority = document.getElementById('taskPriority').value;
             const column = document.getElementById('taskColumn').value;
+            const assignee = document.getElementById('taskAssignee').value;
 
             if (!title) return;
 
@@ -851,7 +971,8 @@
                         title,
                         description,
                         priority,
-                        column
+                        column,
+                        assignee
                     };
                 }
             } else {
@@ -862,6 +983,7 @@
                     description,
                     priority,
                     column,
+                    assignee,
                     createdAt: new Date().toISOString()
                 };
                 tasks.push(newTask);
@@ -883,6 +1005,32 @@
             saveTasks();
             renderAllTasks();
             closeModal();
+        }
+
+        // Copy task to clipboard for Nikoline
+        function copyTaskToClipboard(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            const formattedText = `TASK: ${task.title}\nDescription: ${task.description || 'No description'}\nPriority: ${task.priority}\nColumn: ${getColumnLabel(task.column)}`;
+
+            navigator.clipboard.writeText(formattedText).then(() => {
+                showToast('Copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                showToast('Failed to copy');
+            });
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
         }
 
         // Drag and Drop
