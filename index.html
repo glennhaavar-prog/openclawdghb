@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-card: #1c2128;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #58a6ff;
+            --accent-purple: #a371f7;
+            --accent-green: #3fb950;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --priority-low: #3fb950;
+            --priority-medium: #d29922;
+            --priority-high: #f85149;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .logo h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .task-count {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4c9aed;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e5443c;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 0.375rem;
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        /* Board */
+        .board {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem;
+            min-height: calc(100vh - 65px);
+            overflow-x: auto;
+        }
+
+        /* Columns */
+        .column {
+            flex: 0 0 300px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 100px);
+        }
+
+        .column-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .column-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .column-title h2 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .column-count {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .column-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .column[data-column="ideas"] .column-dot { background: var(--accent-purple); }
+        .column[data-column="todo"] .column-dot { background: var(--accent-blue); }
+        .column[data-column="inprogress"] .column-dot { background: var(--accent-orange); }
+        .column[data-column="review"] .column-dot { background: #a371f7; }
+        .column[data-column="done"] .column-dot { background: var(--accent-green); }
+
+        .column-content {
+            flex: 1;
+            padding: 0.75rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .column-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .column-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .column-content::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .column-content.drag-over {
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        /* Task Cards */
+        .task-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.875rem;
+            cursor: grab;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .task-card:hover {
+            border-color: var(--accent-blue);
+            box-shadow: var(--shadow-sm);
+            transform: translateY(-2px);
+        }
+
+        .task-card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .task-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .task-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            line-height: 1.4;
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 0.25rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .task-card:hover .task-actions {
+            opacity: 1;
+        }
+
+        .task-description {
+            font-size: 0.813rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 0.75rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .task-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .priority-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .priority-low {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--priority-low);
+        }
+
+        .priority-medium {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--priority-medium);
+        }
+
+        .priority-high {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--priority-high);
+        }
+
+        .task-date {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* Add task button in column */
+        .add-task-inline {
+            padding: 0.75rem;
+            margin: 0.75rem;
+            margin-top: 0;
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+
+        .add-task-inline:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 480px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-group select {
+            cursor: pointer;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .modal-footer {
+            padding: 1.25rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 0.813rem;
+        }
+
+        /* Delete confirmation */
+        .delete-confirm {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .delete-confirm p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .delete-confirm-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .board {
+                padding: 1rem;
+            }
+
+            .column {
+                flex: 0 0 280px;
+            }
+        }
+
+        /* Icon placeholders using CSS */
+        .icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">K</div>
+            <h1>Kanban Board</h1>
+        </div>
+        <div class="header-actions">
+            <span class="task-count" id="taskCount">0 tasks</span>
+            <button class="btn btn-primary" onclick="openModal()">
+                <span class="icon">+</span>
+                New Task
+            </button>
+        </div>
+    </header>
+
+    <main class="board" id="board">
+        <div class="column" data-column="ideas">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-dot"></span>
+                    <h2>Ideas</h2>
+                    <span class="column-count" data-count="ideas">0</span>
+                </div>
+            </div>
+            <div class="column-content" data-column="ideas"></div>
+            <button class="add-task-inline" onclick="openModal('ideas')">
+                <span class="icon">+</span>
+                Add task
+            </button>
+        </div>
+
+        <div class="column" data-column="todo">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-dot"></span>
+                    <h2>To Do</h2>
+                    <span class="column-count" data-count="todo">0</span>
+                </div>
+            </div>
+            <div class="column-content" data-column="todo"></div>
+            <button class="add-task-inline" onclick="openModal('todo')">
+                <span class="icon">+</span>
+                Add task
+            </button>
+        </div>
+
+        <div class="column" data-column="inprogress">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-dot"></span>
+                    <h2>In Progress</h2>
+                    <span class="column-count" data-count="inprogress">0</span>
+                </div>
+            </div>
+            <div class="column-content" data-column="inprogress"></div>
+            <button class="add-task-inline" onclick="openModal('inprogress')">
+                <span class="icon">+</span>
+                Add task
+            </button>
+        </div>
+
+        <div class="column" data-column="review">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-dot"></span>
+                    <h2>Review</h2>
+                    <span class="column-count" data-count="review">0</span>
+                </div>
+            </div>
+            <div class="column-content" data-column="review"></div>
+            <button class="add-task-inline" onclick="openModal('review')">
+                <span class="icon">+</span>
+                Add task
+            </button>
+        </div>
+
+        <div class="column" data-column="done">
+            <div class="column-header">
+                <div class="column-title">
+                    <span class="column-dot"></span>
+                    <h2>Done</h2>
+                    <span class="column-count" data-count="done">0</span>
+                </div>
+            </div>
+            <div class="column-content" data-column="done"></div>
+            <button class="add-task-inline" onclick="openModal('done')">
+                <span class="icon">+</span>
+                Add task
+            </button>
+        </div>
+    </main>
+
+    <!-- Task Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">New Task</h3>
+                <button class="btn btn-ghost" onclick="closeModal()">
+                    <span class="icon">×</span>
+                </button>
+            </div>
+            <form id="taskForm" onsubmit="saveTask(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="taskTitle">Title</label>
+                        <input type="text" id="taskTitle" placeholder="Enter task title..." required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDescription">Description</label>
+                        <textarea id="taskDescription" placeholder="Enter task description (optional)..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="taskPriority">Priority</label>
+                            <select id="taskPriority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskColumn">Column</label>
+                            <select id="taskColumn">
+                                <option value="ideas">Ideas</option>
+                                <option value="todo">To Do</option>
+                                <option value="inprogress">In Progress</option>
+                                <option value="review">Review</option>
+                                <option value="done">Done</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="deleteSection"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let tasks = [];
+        let editingTaskId = null;
+
+        // Storage key
+        const STORAGE_KEY = 'kanban_tasks';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTasks();
+            renderAllTasks();
+            setupDragAndDrop();
+        });
+
+        // Local Storage
+        function loadTasks() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    tasks = JSON.parse(stored);
+                } catch (e) {
+                    tasks = [];
+                }
+            }
+        }
+
+        function saveTasks() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+        }
+
+        // Generate unique ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+            if (days === 0) return 'Today';
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return `${days} days ago`;
+
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        // Render tasks
+        function renderAllTasks() {
+            const columns = ['ideas', 'todo', 'inprogress', 'review', 'done'];
+
+            columns.forEach(column => {
+                const container = document.querySelector(`.column-content[data-column="${column}"]`);
+                const columnTasks = tasks.filter(t => t.column === column);
+
+                container.innerHTML = '';
+
+                if (columnTasks.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">○</div>
+                            <p>No tasks yet</p>
+                        </div>
+                    `;
+                } else {
+                    columnTasks.forEach(task => {
+                        container.appendChild(createTaskCard(task));
+                    });
+                }
+
+                // Update count
+                document.querySelector(`[data-count="${column}"]`).textContent = columnTasks.length;
+            });
+
+            // Update total count
+            document.getElementById('taskCount').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+        }
+
+        function createTaskCard(task) {
+            const card = document.createElement('div');
+            card.className = 'task-card';
+            card.draggable = true;
+            card.dataset.taskId = task.id;
+
+            card.innerHTML = `
+                <div class="task-card-header">
+                    <span class="task-title">${escapeHtml(task.title)}</span>
+                    <div class="task-actions">
+                        <button class="btn btn-ghost" onclick="editTask('${task.id}')" title="Edit">
+                            <span class="icon">✎</span>
+                        </button>
+                        <button class="btn btn-ghost" onclick="deleteTask('${task.id}')" title="Delete">
+                            <span class="icon">×</span>
+                        </button>
+                    </div>
+                </div>
+                ${task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : ''}
+                <div class="task-meta">
+                    <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+                    <span class="task-date">${formatDate(task.createdAt)}</span>
+                </div>
+            `;
+
+            return card;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Modal functions
+        function openModal(column = 'todo') {
+            editingTaskId = null;
+            document.getElementById('modalTitle').textContent = 'New Task';
+            document.getElementById('submitBtn').textContent = 'Create Task';
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskColumn').value = column;
+            document.getElementById('deleteSection').innerHTML = '';
+            document.getElementById('modalOverlay').classList.add('active');
+            document.getElementById('taskTitle').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            editingTaskId = null;
+        }
+
+        function editTask(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            editingTaskId = taskId;
+            document.getElementById('modalTitle').textContent = 'Edit Task';
+            document.getElementById('submitBtn').textContent = 'Save Changes';
+            document.getElementById('taskTitle').value = task.title;
+            document.getElementById('taskDescription').value = task.description || '';
+            document.getElementById('taskPriority').value = task.priority;
+            document.getElementById('taskColumn').value = task.column;
+
+            document.getElementById('deleteSection').innerHTML = `
+                <div class="delete-confirm">
+                    <p>Danger zone</p>
+                    <div class="delete-confirm-actions">
+                        <button type="button" class="btn btn-danger" onclick="confirmDelete('${taskId}')">
+                            Delete Task
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('modalOverlay').classList.add('active');
+            document.getElementById('taskTitle').focus();
+        }
+
+        function saveTask(event) {
+            event.preventDefault();
+
+            const title = document.getElementById('taskTitle').value.trim();
+            const description = document.getElementById('taskDescription').value.trim();
+            const priority = document.getElementById('taskPriority').value;
+            const column = document.getElementById('taskColumn').value;
+
+            if (!title) return;
+
+            if (editingTaskId) {
+                // Update existing task
+                const taskIndex = tasks.findIndex(t => t.id === editingTaskId);
+                if (taskIndex !== -1) {
+                    tasks[taskIndex] = {
+                        ...tasks[taskIndex],
+                        title,
+                        description,
+                        priority,
+                        column
+                    };
+                }
+            } else {
+                // Create new task
+                const newTask = {
+                    id: generateId(),
+                    title,
+                    description,
+                    priority,
+                    column,
+                    createdAt: new Date().toISOString()
+                };
+                tasks.push(newTask);
+            }
+
+            saveTasks();
+            renderAllTasks();
+            closeModal();
+        }
+
+        function deleteTask(taskId) {
+            if (confirm('Are you sure you want to delete this task?')) {
+                confirmDelete(taskId);
+            }
+        }
+
+        function confirmDelete(taskId) {
+            tasks = tasks.filter(t => t.id !== taskId);
+            saveTasks();
+            renderAllTasks();
+            closeModal();
+        }
+
+        // Drag and Drop
+        function setupDragAndDrop() {
+            const board = document.getElementById('board');
+
+            // Drag start
+            board.addEventListener('dragstart', (e) => {
+                if (e.target.classList.contains('task-card')) {
+                    e.target.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+            });
+
+            // Drag end
+            board.addEventListener('dragend', (e) => {
+                if (e.target.classList.contains('task-card')) {
+                    e.target.classList.remove('dragging');
+                }
+                document.querySelectorAll('.column-content').forEach(col => {
+                    col.classList.remove('drag-over');
+                });
+            });
+
+            // Drag over
+            board.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const columnContent = e.target.closest('.column-content');
+                if (columnContent) {
+                    e.dataTransfer.dropEffect = 'move';
+                    columnContent.classList.add('drag-over');
+                }
+            });
+
+            // Drag leave
+            board.addEventListener('dragleave', (e) => {
+                const columnContent = e.target.closest('.column-content');
+                if (columnContent && !columnContent.contains(e.relatedTarget)) {
+                    columnContent.classList.remove('drag-over');
+                }
+            });
+
+            // Drop
+            board.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const columnContent = e.target.closest('.column-content');
+
+                if (columnContent) {
+                    const taskId = e.dataTransfer.getData('text/plain');
+                    const newColumn = columnContent.dataset.column;
+
+                    const taskIndex = tasks.findIndex(t => t.id === taskId);
+                    if (taskIndex !== -1) {
+                        tasks[taskIndex].column = newColumn;
+                        saveTasks();
+                        renderAllTasks();
+                    }
+                }
+
+                document.querySelectorAll('.column-content').forEach(col => {
+                    col.classList.remove('drag-over');
+                });
+            });
+        }
+
+        // Close modal on overlay click
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target.id === 'modalOverlay') {
+                closeModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
