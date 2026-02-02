@@ -745,18 +745,16 @@
                         <label for="githubToken">GitHub Personal Access Token</label>
                         <input type="password" id="githubToken" placeholder="ghp_..." autocomplete="off">
                         <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
-                            Create a token at <strong>github.com/settings/tokens</strong> with <strong>repo</strong> scope
+                            Create a token at <strong>github.com/settings/tokens</strong> with <strong>gist</strong> scope
                         </p>
                     </div>
 
                     <div class="form-group">
-                        <label for="githubRepo">Repository</label>
-                        <input type="text" id="githubRepo" placeholder="glennhaavar-prog/openclawdghb" value="glennhaavar-prog/openclawdghb" readonly>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="githubFile">Tasks File</label>
-                        <input type="text" id="githubFile" placeholder="tasks.json" value="tasks.json" readonly>
+                        <label for="gistId">Gist ID</label>
+                        <input type="text" id="gistId" placeholder="f9ccd3ba6fbf6f04f69deef9e6cb3beb" value="f9ccd3ba6fbf6f04f69deef9e6cb3beb">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+                            Gist ID from <strong>gist.github.com</strong> containing <code>kanban-tasks.json</code>
+                        </p>
                     </div>
 
                     <div class="form-group">
@@ -852,8 +850,7 @@
         // Storage keys
         const STORAGE_KEY = 'kanban_tasks';
         const GITHUB_TOKEN_KEY = 'kanban_github_token';
-        const GITHUB_REPO_KEY = 'kanban_github_repo';
-        const GITHUB_FILE_KEY = 'kanban_github_file';
+        const GIST_ID_KEY = 'kanban_gist_id';
         const WEBHOOK_KEY = 'kanban_webhook_url';
 
         // Initialize
@@ -970,7 +967,7 @@
             }
         ];
 
-        // GitHub Configuration
+        // GitHub Gist Configuration
         function getGithubToken() {
             return localStorage.getItem(GITHUB_TOKEN_KEY) || '';
         }
@@ -979,20 +976,12 @@
             localStorage.setItem(GITHUB_TOKEN_KEY, token);
         }
 
-        function getGithubRepo() {
-            return localStorage.getItem(GITHUB_REPO_KEY) || 'glennhaavar-prog/openclawdghb';
+        function getGistId() {
+            return localStorage.getItem(GIST_ID_KEY) || 'f9ccd3ba6fbf6f04f69deef9e6cb3beb';
         }
 
-        function setGithubRepo(repo) {
-            localStorage.setItem(GITHUB_REPO_KEY, repo);
-        }
-
-        function getGithubFile() {
-            return localStorage.getItem(GITHUB_FILE_KEY) || 'tasks.json';
-        }
-
-        function setGithubFile(file) {
-            localStorage.setItem(GITHUB_FILE_KEY, file);
+        function setGistId(gistId) {
+            localStorage.setItem(GIST_ID_KEY, gistId);
         }
 
         // Sync Status Management
@@ -1013,79 +1002,76 @@
             }
         }
 
-        // GitHub API - Load Tasks
+        // GitHub Gist API - Load Tasks
         async function loadFromGitHub() {
             const token = getGithubToken();
-            if (!token) {
+            const gistId = getGistId();
+            
+            if (!token || !gistId) {
                 return null; // Use fallback
             }
 
             try {
                 setSyncStatus('syncing', 'Syncing...');
                 
-                const repo = getGithubRepo();
-                const file = getGithubFile();
-                const url = `https://raw.githubusercontent.com/${repo}/main/${file}`;
+                const url = `https://api.github.com/gists/${gistId}`;
 
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`GitHub fetch failed: ${response.status}`);
-                }
-
-                const data = await response.json();
-                setSyncStatus('synced', 'Synced');
-                return data;
-            } catch (error) {
-                console.error('GitHub load error:', error);
-                setSyncStatus('error', 'Sync failed');
-                showToast(`❌ GitHub sync failed: ${error.message}`);
-                return null;
-            }
-        }
-
-        // GitHub API - Save Tasks
-        async function saveToGitHub() {
-            const token = getGithubToken();
-            if (!token) {
-                return false; // Use localStorage only
-            }
-
-            try {
-                setSyncStatus('syncing', 'Saving...');
-                
-                const repo = getGithubRepo();
-                const file = getGithubFile();
-                const url = `https://api.github.com/repos/${repo}/contents/${file}`;
-
-                // First, get the current file SHA (needed for updates)
-                const getResponse = await fetch(url, {
+                const response = await fetch(url, {
                     headers: {
                         'Authorization': `token ${token}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
 
-                let sha = '';
-                if (getResponse.ok) {
-                    const fileData = await getResponse.json();
-                    sha = fileData.sha;
+                if (!response.ok) {
+                    throw new Error(`Gist fetch failed: ${response.status}`);
                 }
 
-                // Prepare the commit
-                const content = btoa(JSON.stringify(tasks, null, 2)); // Base64 encode
+                const gist = await response.json();
+                const fileContent = gist.files['kanban-tasks.json']?.content;
+                
+                if (!fileContent) {
+                    throw new Error('kanban-tasks.json not found in gist');
+                }
+
+                const data = JSON.parse(fileContent);
+                setSyncStatus('synced', 'Synced');
+                return data;
+            } catch (error) {
+                console.error('Gist load error:', error);
+                setSyncStatus('error', 'Sync failed');
+                showToast(`❌ Gist sync failed: ${error.message}`);
+                return null;
+            }
+        }
+
+        // GitHub Gist API - Save Tasks
+        async function saveToGitHub() {
+            const token = getGithubToken();
+            const gistId = getGistId();
+            
+            if (!token || !gistId) {
+                return false; // Use localStorage only
+            }
+
+            try {
+                setSyncStatus('syncing', 'Saving...');
+                
+                const url = `https://api.github.com/gists/${gistId}`;
+
+                // Prepare the gist update payload
                 const payload = {
-                    message: `Update tasks at ${new Date().toISOString()}`,
-                    content: content,
-                    branch: 'main'
+                    description: `Kanban Dashboard Tasks - Updated at ${new Date().toISOString()}`,
+                    files: {
+                        'kanban-tasks.json': {
+                            content: JSON.stringify(tasks, null, 2)
+                        }
+                    }
                 };
 
-                if (sha) {
-                    payload.sha = sha; // Required for updates
-                }
-
-                // Commit the changes
-                const putResponse = await fetch(url, {
-                    method: 'PUT',
+                // Update the gist via PATCH
+                const patchResponse = await fetch(url, {
+                    method: 'PATCH',
                     headers: {
                         'Authorization': `token ${token}`,
                         'Accept': 'application/vnd.github.v3+json',
@@ -1094,17 +1080,17 @@
                     body: JSON.stringify(payload)
                 });
 
-                if (!putResponse.ok) {
-                    const errorData = await putResponse.json();
-                    throw new Error(errorData.message || `GitHub save failed: ${putResponse.status}`);
+                if (!patchResponse.ok) {
+                    const errorData = await patchResponse.json();
+                    throw new Error(errorData.message || `Gist save failed: ${patchResponse.status}`);
                 }
 
                 setSyncStatus('synced', 'Saved');
                 return true;
             } catch (error) {
-                console.error('GitHub save error:', error);
+                console.error('Gist save error:', error);
                 setSyncStatus('error', 'Save failed');
-                showToast(`❌ Failed to save to GitHub: ${error.message}`);
+                showToast(`❌ Failed to save to Gist: ${error.message}`);
                 return false;
             }
         }
@@ -1417,9 +1403,11 @@
         // Settings Modal Functions
         function openSettings() {
             const token = getGithubToken();
+            const gistId = getGistId();
             const webhookUrl = getWebhookUrl();
 
             document.getElementById('githubToken').value = token;
+            document.getElementById('gistId').value = gistId;
             document.getElementById('webhookUrl').value = webhookUrl;
             document.getElementById('settingsOverlay').classList.add('active');
         }
@@ -1432,9 +1420,11 @@
             event.preventDefault();
 
             const token = document.getElementById('githubToken').value.trim();
+            const gistId = document.getElementById('gistId').value.trim();
             const webhookUrl = document.getElementById('webhookUrl').value.trim();
 
             setGithubToken(token);
+            setGistId(gistId);
             setWebhookUrl(webhookUrl);
 
             showToast('✅ Settings saved!');
