@@ -596,6 +596,9 @@
         </div>
         <div class="header-actions">
             <span class="task-count" id="taskCount">0 tasks</span>
+            <button class="btn" onclick="openSettings()" title="Configure webhook">
+                ⚙️
+            </button>
             <button class="btn btn-primary" onclick="openModal()">
                 <span class="icon">+</span>
                 New Task
@@ -1092,19 +1095,75 @@
             closeModal();
         }
 
-        // Copy task to clipboard for Nikoline
+        // Webhook URL storage
+        const WEBHOOK_KEY = 'kanban_webhook_url';
+        
+        function getWebhookUrl() {
+            return localStorage.getItem(WEBHOOK_KEY) || '';
+        }
+        
+        function setWebhookUrl(url) {
+            localStorage.setItem(WEBHOOK_KEY, url);
+        }
+
+        // Send task to Nikoline (webhook + clipboard fallback)
         function copyTaskToClipboard(taskId) {
             const task = tasks.find(t => t.id === taskId);
             if (!task) return;
 
+            const taskData = {
+                id: task.id,
+                title: task.title,
+                description: task.description || '',
+                priority: task.priority,
+                column: getColumnLabel(task.column),
+                assignee: task.assignee
+            };
+
             const formattedText = `TASK: ${task.title}\nDescription: ${task.description || 'No description'}\nPriority: ${task.priority}\nColumn: ${getColumnLabel(task.column)}`;
 
-            navigator.clipboard.writeText(formattedText).then(() => {
-                showToast('Copied to clipboard!');
-            }).catch(err => {
-                console.error('Failed to copy:', err);
-                showToast('Failed to copy');
-            });
+            const webhookUrl = getWebhookUrl();
+            
+            if (webhookUrl) {
+                // Try webhook first
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(taskData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('✅ Sent to Nikoline!');
+                    } else {
+                        throw new Error('Webhook failed');
+                    }
+                })
+                .catch(err => {
+                    console.error('Webhook failed, copying to clipboard:', err);
+                    navigator.clipboard.writeText(formattedText).then(() => {
+                        showToast('⚠️ Webhook failed - copied to clipboard');
+                    });
+                });
+            } else {
+                // No webhook configured, use clipboard
+                navigator.clipboard.writeText(formattedText).then(() => {
+                    showToast('📋 Copied to clipboard!');
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                    showToast('❌ Failed to copy');
+                });
+            }
+        }
+        
+        // Settings modal for webhook
+        function openSettings() {
+            const currentUrl = getWebhookUrl();
+            const newUrl = prompt('Enter webhook URL for Nikoline (leave empty to use clipboard only):', currentUrl);
+            if (newUrl !== null) {
+                setWebhookUrl(newUrl.trim());
+                showToast(newUrl.trim() ? '⚙️ Webhook URL saved!' : '⚙️ Using clipboard mode');
+            }
         }
 
         // Toast notification
