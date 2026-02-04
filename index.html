@@ -1007,7 +1007,7 @@
             const token = getGithubToken();
             const gistId = getGistId();
             
-            if (!token || !gistId) {
+            if (!gistId) {
                 return null; // Use fallback
             }
 
@@ -1016,11 +1016,17 @@
                 
                 const url = `https://api.github.com/gists/${gistId}`;
 
+                const headers = {
+                    'Accept': 'application/vnd.github.v3+json'
+                };
+                
+                // Add auth header only if token is provided (for private gists)
+                if (token) {
+                    headers['Authorization'] = `token ${token}`;
+                }
+
                 const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
+                    headers: headers
                 });
 
                 if (!response.ok) {
@@ -1036,7 +1042,8 @@
 
                 const data = JSON.parse(fileContent);
                 setSyncStatus('synced', 'Synced');
-                return data;
+                // Handle both wrapped {tasks: [...]} and flat [...] formats
+                return data.tasks || data;
             } catch (error) {
                 console.error('Gist load error:', error);
                 setSyncStatus('error', 'Sync failed');
@@ -1064,7 +1071,7 @@
                     description: `Kanban Dashboard Tasks - Updated at ${new Date().toISOString()}`,
                     files: {
                         'kanban-tasks.json': {
-                            content: JSON.stringify(tasks, null, 2)
+                            content: JSON.stringify({tasks: tasks}, null, 2)
                         }
                     }
                 };
